@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <h1><span style="color:#2d7eea">README - Your LookML Project</span></h1>
 
 <h2><span style="color:#2d7eea">LookML Overview</span></h2>
@@ -49,3 +50,6 @@ To learn more about LookML and how to develop visit:
 - [Looker User Guide](https://looker.com/guide)
 - [Looker Help Center](https://help.looker.com)
 - [Looker University](https://training.looker.com/)
+=======
+# Test_Looker
+>>>>>>> branch 'master' of git@github.com:Greg1291/Test_Looker.git
