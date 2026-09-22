@@ -36,6 +36,15 @@ looker.plugins.visualizations.add({
     const appliedFilters = queryResponse.applied_filters || {};
     const rawValue = appliedFilters[filterName];
 
+    // --- DEBUG TEMPORANEO ---
+    // Apri la Console del browser (F12) per vedere esattamente cosa arriva.
+    // Rimuovi queste righe una volta risolto il problema.
+    console.log("[tabella_colonne_dinamiche] filterName cercato:", filterName);
+    console.log("[tabella_colonne_dinamiche] chiavi disponibili in applied_filters:", Object.keys(appliedFilters));
+    console.log("[tabella_colonne_dinamiche] applied_filters completo:", appliedFilters);
+    console.log("[tabella_colonne_dinamiche] rawValue trovato:", rawValue);
+    // --- FINE DEBUG ---
+
     let selezionati = [];
     if (rawValue) {
       // I filtri "is any of" arrivano come stringa separata da virgole,
