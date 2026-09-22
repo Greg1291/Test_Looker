@@ -3,10 +3,16 @@ looker.plugins.visualizations.add({
   label: "Tabella con colonne dinamiche",
 
   options: {
-    filter_name: {
+    campo_tecnico: {
       type: "string",
-      label: "Nome tecnico del filtro colonne (view.filter)",
-      default: "ordini_toggle_colonne.colonne_da_mostrare",
+      label: "Nome tecnico del campo che espone il filtro (view.dimension)",
+      default: "ordini_toggle_colonne.colonne_selezionate_raw",
+      section: "Configurazione"
+    },
+    mostra_debug: {
+      type: "boolean",
+      label: "Mostra riquadro di debug",
+      default: false,
       section: "Configurazione"
     }
   },
@@ -28,60 +34,35 @@ looker.plugins.visualizations.add({
     const container = this._container;
     container.innerHTML = "";
 
-    // Nome tecnico del filtro (view.filter), configurabile dalle opzioni della viz
-    const filterName = config.filter_name || "ordini_toggle_colonne.colonne_da_mostrare";
+    // Nome tecnico del campo che espone il valore del filtro (via Liquid _filters).
+    const campoTecnico =
+      config.campo_tecnico || "ordini_toggle_colonne.colonne_selezionate_raw";
 
-    // Legge i valori selezionati direttamente dai filtri applicati alla query,
-    // senza bisogno di includere il filtro come campo nella query.
-    const appliedFilters = queryResponse.applied_filters || {};
-    const rawFilterEntry = appliedFilters[filterName];
-
-    // A seconda della versione di Looker, l'entry può essere una stringa
-    // semplice oppure un oggetto { field: {...}, value: "..." }.
-    // Gestiamo entrambi i casi.
+    // Legge il valore del filtro dalla prima riga dei dati: il campo tecnico
+    // contiene lo stesso valore costante su ogni riga.
     let rawValue = "";
-    if (rawFilterEntry && typeof rawFilterEntry === "object") {
-      rawValue = rawFilterEntry.value || "";
-    } else if (typeof rawFilterEntry === "string") {
-      rawValue = rawFilterEntry;
+    if (data && data.length > 0 && data[0][campoTecnico]) {
+      rawValue = data[0][campoTecnico].value || "";
     }
-
-    // --- DEBUG TEMPORANEO: scritto direttamente nella pagina, niente Console ---
-    const debugBox = document.createElement("pre");
-    debugBox.style.background = "#fff3cd";
-    debugBox.style.border = "1px solid #ffc107";
-    debugBox.style.padding = "8px";
-    debugBox.style.fontSize = "11px";
-    debugBox.style.whiteSpace = "pre-wrap";
-    debugBox.style.wordBreak = "break-all";
-    debugBox.textContent =
-      "DEBUG\n" +
-      "filterName cercato: " + filterName + "\n" +
-      "chiavi in applied_filters: " + JSON.stringify(Object.keys(appliedFilters)) + "\n" +
-      "applied_filters completo: " + JSON.stringify(appliedFilters) + "\n" +
-      "rawFilterEntry: " + JSON.stringify(rawFilterEntry) + "\n" +
-      "rawValue estratto: " + JSON.stringify(rawValue) + "\n" +
-      "config completo: " + JSON.stringify(config);
-    container.appendChild(debugBox);
-    // --- FINE DEBUG ---
 
     let selezionati = [];
     if (rawValue) {
-      // I filtri "is any of" arrivano come stringa separata da virgole,
-      // es. "paese,regione,categoria"
+      // Il valore arriva come stringa, es. "paese,regione,categoria".
+      // Ripulisce eventuali apici/virgolette lasciate dal filtro Liquid.
       selezionati = String(rawValue)
+        .replace(/['"]/g, "")
         .split(",")
         .map((v) => v.trim().toLowerCase())
         .filter((v) => v.length > 0);
     }
 
-    // Tutti i campi disponibili nella query (dimensioni + misure), nell'ordine scelto dall'utente
-    const tuttiICampi = queryResponse.fields.dimension_like.concat(
-      queryResponse.fields.measure_like
-    );
+    // Tutti i campi della query, escluso il campo tecnico (che non va mai mostrato).
+    const tuttiICampi = queryResponse.fields.dimension_like
+      .concat(queryResponse.fields.measure_like)
+      .filter((field) => field.name !== campoTecnico);
 
-    // Se non è selezionato nulla, mostra tutte le colonne (comportamento di default);
-    // se sono selezionate colonne, mostra solo quelle il cui "codice" combacia.
+    // Nessuna selezione => mostra tutte le colonne.
+    // Con selezione => mostra solo quelle il cui "codice" combacia.
     const campiDaMostrare =
       selezionati.length === 0
         ? tuttiICampi
@@ -90,10 +71,36 @@ looker.plugins.visualizations.add({
             return selezionati.includes(codice);
           });
 
+    // Riquadro di debug opzionale (attivabile dalle opzioni della visualizzazione).
+    if (config.mostra_debug) {
+      const debugBox = document.createElement("pre");
+      debugBox.style.background = "#fff3cd";
+      debugBox.style.border = "1px solid #ffc107";
+      debugBox.style.padding = "8px";
+      debugBox.style.fontSize = "11px";
+      debugBox.style.whiteSpace = "pre-wrap";
+      debugBox.style.wordBreak = "break-all";
+      debugBox.textContent =
+        "DEBUG\n" +
+        "campo tecnico cercato: " + campoTecnico + "\n" +
+        "campi presenti nella query: " +
+        JSON.stringify(
+          queryResponse.fields.dimension_like
+            .concat(queryResponse.fields.measure_like)
+            .map((f) => f.name)
+        ) + "\n" +
+        "rawValue letto dal campo tecnico: " + JSON.stringify(rawValue) + "\n" +
+        "codici selezionati: " + JSON.stringify(selezionati) + "\n" +
+        "colonne da mostrare: " + JSON.stringify(campiDaMostrare.map((f) => f.name));
+      container.appendChild(debugBox);
+    }
+
     if (campiDaMostrare.length === 0) {
       this.addError({
         title: "Nessuna colonna selezionata",
-        message: "Seleziona almeno una colonna dal filtro per visualizzare la tabella."
+        message:
+          "Nessuna colonna corrisponde alla selezione. Verifica che i valori del filtro " +
+          "coincidano con i nomi tecnici dei campi (es. 'paese', 'importo_totale')."
       });
       done();
       return;
