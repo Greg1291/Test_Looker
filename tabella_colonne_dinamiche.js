@@ -46,10 +46,23 @@ looker.plugins.visualizations.add({
       rawValue = rawFilterEntry;
     }
 
-    // --- DEBUG TEMPORANEO ---
-    console.log("[tabella_colonne_dinamiche] filterName cercato:", filterName);
-    console.log("[tabella_colonne_dinamiche] rawFilterEntry:", rawFilterEntry);
-    console.log("[tabella_colonne_dinamiche] rawValue estratto:", rawValue);
+    // --- DEBUG TEMPORANEO: scritto direttamente nella pagina, niente Console ---
+    const debugBox = document.createElement("pre");
+    debugBox.style.background = "#fff3cd";
+    debugBox.style.border = "1px solid #ffc107";
+    debugBox.style.padding = "8px";
+    debugBox.style.fontSize = "11px";
+    debugBox.style.whiteSpace = "pre-wrap";
+    debugBox.style.wordBreak = "break-all";
+    debugBox.textContent =
+      "DEBUG\n" +
+      "filterName cercato: " + filterName + "\n" +
+      "chiavi in applied_filters: " + JSON.stringify(Object.keys(appliedFilters)) + "\n" +
+      "applied_filters completo: " + JSON.stringify(appliedFilters) + "\n" +
+      "rawFilterEntry: " + JSON.stringify(rawFilterEntry) + "\n" +
+      "rawValue estratto: " + JSON.stringify(rawValue) + "\n" +
+      "config completo: " + JSON.stringify(config);
+    container.appendChild(debugBox);
     // --- FINE DEBUG ---
 
     let selezionati = [];
