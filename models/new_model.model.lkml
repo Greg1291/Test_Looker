@@ -26,4 +26,4 @@ persist_with: new_model_default_datagroup
 # Each joined view also needs to define a primary key.
 
 explore: batches_md {}
-
+explore: ordini_toggle_colonne {}
