@@ -108,6 +108,7 @@ view: ordini_toggle_colonne {
   dimension: data_ordine {
     label: "Data Ordine"
     type: date
+    datatype: date
     sql: ${TABLE}.data_ordine ;;
   }
 
