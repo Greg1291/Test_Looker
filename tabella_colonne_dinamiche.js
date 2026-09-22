@@ -34,15 +34,22 @@ looker.plugins.visualizations.add({
     // Legge i valori selezionati direttamente dai filtri applicati alla query,
     // senza bisogno di includere il filtro come campo nella query.
     const appliedFilters = queryResponse.applied_filters || {};
-    const rawValue = appliedFilters[filterName];
+    const rawFilterEntry = appliedFilters[filterName];
+
+    // A seconda della versione di Looker, l'entry può essere una stringa
+    // semplice oppure un oggetto { field: {...}, value: "..." }.
+    // Gestiamo entrambi i casi.
+    let rawValue = "";
+    if (rawFilterEntry && typeof rawFilterEntry === "object") {
+      rawValue = rawFilterEntry.value || "";
+    } else if (typeof rawFilterEntry === "string") {
+      rawValue = rawFilterEntry;
+    }
 
     // --- DEBUG TEMPORANEO ---
-    // Apri la Console del browser (F12) per vedere esattamente cosa arriva.
-    // Rimuovi queste righe una volta risolto il problema.
     console.log("[tabella_colonne_dinamiche] filterName cercato:", filterName);
-    console.log("[tabella_colonne_dinamiche] chiavi disponibili in applied_filters:", Object.keys(appliedFilters));
-    console.log("[tabella_colonne_dinamiche] applied_filters completo:", appliedFilters);
-    console.log("[tabella_colonne_dinamiche] rawValue trovato:", rawValue);
+    console.log("[tabella_colonne_dinamiche] rawFilterEntry:", rawFilterEntry);
+    console.log("[tabella_colonne_dinamiche] rawValue estratto:", rawValue);
     // --- FINE DEBUG ---
 
     let selezionati = [];
