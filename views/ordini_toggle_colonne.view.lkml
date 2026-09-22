@@ -36,7 +36,8 @@ view: ordini_toggle_colonne {
         SELECT 7  AS id_ordine, 'Italia'   AS paese, 'Lombardia'     AS regione, 'Bergamo'     AS citta, 'Casa'          AS categoria, 60.00  AS importo, DATE('2026-01-20') AS data_ordine UNION ALL
         SELECT 8  AS id_ordine, 'Francia'  AS paese, 'Provenza'      AS regione, 'Marsiglia'   AS citta, 'Abbigliamento' AS categoria, 88.50  AS importo, DATE('2026-01-22') AS data_ordine UNION ALL
         SELECT 9  AS id_ordine, 'Germania' AS paese, 'Assia'         AS regione, 'Francoforte' AS citta, 'Elettronica'   AS categoria, 150.00 AS importo, DATE('2026-01-25') AS data_ordine UNION ALL
-        SELECT 10 AS id_ordine, 'Italia'   AS paese, 'Lazio'         AS regione, 'Latina'      AS citta, 'Casa'          AS categoria, 40.20  AS importo, DATE('2026-01-28') AS data_ordine
+        SELECT 10 AS id_ordine, 'Italia'   AS paese, 'Lazio'         AS regione, 'Latina'      AS citta, 'Casa'          AS categoria, 40.20  AS importo, DATE('2026-01-28') AS data_ordine UNION ALL
+        SELECT 1  AS id_ordine, 'Italia'   AS paese, 'Lombardia'     AS regione, 'Milano'      AS citta, 'Abbigliamento'   AS categoria, 134.50 AS importo, DATE('2026-01-08') AS data_ordine
       ) AS base
     ;;
   }
