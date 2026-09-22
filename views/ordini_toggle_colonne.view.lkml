@@ -62,12 +62,7 @@ view: ordini_toggle_colonne {
   # al codice della custom viz).
   # ------------------------------------------------------------
 
-  dimension: colonne_selezionate_raw {
-    label: "[Tecnico] Colonne selezionate — non rimuovere dalla query"
-    description: "Campo tecnico usato dalla visualizzazione 'Tabella con colonne dinamiche' per sapere quali colonne disegnare. Va sempre incluso nella query."
-    type: string
-    sql: ${colonne_da_mostrare} ;;
-  }
+
 
   # ------------------------------------------------------------
   # DIMENSIONI / MISURE — normali, nessun trucco Liquid: la
