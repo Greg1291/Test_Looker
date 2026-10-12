@@ -15,6 +15,12 @@ looker.plugins.visualizations.add({
       default: false,
       section: "Configurazione"
     },
+    max_righe: {
+      type: "number",
+      label: "Righe visualizzate",
+      default: 500,
+      section: "Configurazione"
+    },
     mostra_debug: {
       type: "boolean",
       label: "Mostra riquadro di debug",
@@ -34,6 +40,8 @@ looker.plugins.visualizations.add({
     this._container = container;
     this._ordine = [];
     this._sort = {};
+    this._pivotDim = "";
+    this._limite = 0;
   },
 
   updateAsync: function (data, element, config, queryResponse, details, done) {
@@ -49,9 +57,10 @@ looker.plugins.visualizations.add({
     const campoTecnico =
       config.campo_tecnico || "ordini_toggle_colonne.colonne_selezionate_raw";
 
-    // ---------- campi e pivot ----------
-    const pivots = queryResponse.pivots || [];
-    const inPivot = pivots.length > 0;
+    // ---------- campi e pivot nativo ----------
+    let pivots = queryResponse.pivots || [];
+    const pivotNativo = pivots.length > 0;
+    let dati = data;
     const pivotFields = (queryResponse.fields.pivots || []).map((f) => f.name);
 
     if (pivotFields.includes(campoTecnico)) {
@@ -95,7 +104,7 @@ looker.plugins.visualizations.add({
       .concat(measureFields)
       .filter((field) => field.name !== campoTecnico);
 
-    const campiDaMostrare =
+    let campiDaMostrare =
       selezionati.length === 0
         ? tuttiICampi
         : tuttiICampi.filter((field) => {
@@ -103,6 +112,93 @@ looker.plugins.visualizations.add({
             const codice = field.name.split(".").pop().toLowerCase();
             return selezionati.includes(codice);
           });
+
+    if (campiDaMostrare.length === 0) {
+      this.addError({
+        title: "Nessuna colonna selezionata",
+        message:
+          "Nessuna colonna corrisponde alla selezione. I valori del filtro devono coincidere " +
+          "con i nomi tecnici dei campi (es. 'paese', 'importo_totale')."
+      });
+      done();
+      return;
+    }
+
+    // ---------- pivot lato client (menu nella viz) ----------
+    let pivotNome = null;
+    if (!pivotNativo) {
+      const dimOpzioni = campiDaMostrare.filter((f) => !misure.has(f.name));
+      if (!dimOpzioni.some((f) => f.name === self._pivotDim)) self._pivotDim = "";
+
+      const bar = document.createElement("div");
+      bar.style.padding = "6px 10px";
+      bar.style.fontSize = "12px";
+      const lbl = document.createElement("span");
+      lbl.textContent = "Pivot su: ";
+      const sel = document.createElement("select");
+      [["", "Nessuno"]]
+        .concat(dimOpzioni.map((f) => [f.name, f.label_short || f.label || f.name]))
+        .forEach((p) => {
+          const o = document.createElement("option");
+          o.value = p[0];
+          o.textContent = p[1];
+          if (p[0] === self._pivotDim) o.selected = true;
+          sel.appendChild(o);
+        });
+      sel.onchange = () => {
+        self._pivotDim = sel.value;
+        rerender();
+      };
+      bar.appendChild(lbl);
+      bar.appendChild(sel);
+      container.appendChild(bar);
+
+      pivotNome = self._pivotDim || null;
+    }
+
+    if (pivotNome) {
+      const dimRighe = campiDaMostrare.filter(
+        (f) => !misure.has(f.name) && f.name !== pivotNome
+      );
+      const misureVis = campiDaMostrare.filter((f) => misure.has(f.name));
+      const valori = [];
+      const visti = new Set();
+      const gruppi = new Map();
+
+      data.forEach((row) => {
+        const pc = row[pivotNome];
+        const pv =
+          pc && pc.value !== null && pc.value !== undefined ? String(pc.value) : "(vuoto)";
+        if (!visti.has(pv)) {
+          visti.add(pv);
+          valori.push(pv);
+        }
+        const chiave = JSON.stringify(
+          dimRighe.map((f) => (row[f.name] ? row[f.name].value : null))
+        );
+        let g = gruppi.get(chiave);
+        if (!g) {
+          g = {};
+          dimRighe.forEach((f) => (g[f.name] = row[f.name]));
+          misureVis.forEach((f) => (g[f.name] = {}));
+          gruppi.set(chiave, g);
+        }
+        misureVis.forEach((f) => {
+          if (row[f.name]) g[f.name][pv] = row[f.name];
+        });
+      });
+
+      valori.sort((a, b) => a.localeCompare(b));
+      pivots = valori.map((pv) => {
+        const d = {};
+        d[pivotNome] = pv;
+        return { key: pv, is_total: false, data: d };
+      });
+      dati = Array.from(gruppi.values());
+      campiDaMostrare = campiDaMostrare.filter((f) => f.name !== pivotNome);
+    }
+
+    const inPivot = pivots.length > 0;
 
     // ---------- debug ----------
     if (config.mostra_debug) {
@@ -117,23 +213,12 @@ looker.plugins.visualizations.add({
         "DEBUG\n" +
         "campo tecnico: " + campoTecnico + "\n" +
         "campi in query: " + JSON.stringify(dimFields.concat(measureFields).map((f) => f.name)) + "\n" +
-        "campi pivot: " + JSON.stringify(pivotFields) + "\n" +
-        "n. pivot: " + pivots.length + "\n" +
+        "pivot nativo: " + pivotNativo + " | pivot client: " + JSON.stringify(pivotNome) + "\n" +
+        "n. valori pivot: " + pivots.length + "\n" +
         "rawValue: " + JSON.stringify(rawValue) + "\n" +
         "codici selezionati: " + JSON.stringify(selezionati) + "\n" +
         "colonne mostrate: " + JSON.stringify(campiDaMostrare.map((f) => f.name));
       container.appendChild(debugBox);
-    }
-
-    if (campiDaMostrare.length === 0) {
-      this.addError({
-        title: "Nessuna colonna selezionata",
-        message:
-          "Nessuna colonna corrisponde alla selezione. I valori del filtro devono coincidere " +
-          "con i nomi tecnici dei campi (es. 'paese', 'importo_totale')."
-      });
-      done();
-      return;
     }
 
     // ---------- ordine colonne (persistente tra i refresh) ----------
@@ -144,7 +229,7 @@ looker.plugins.visualizations.add({
       .concat(nomi.filter((n) => !prec.includes(n)));
     const ordinati = this._ordine.map((n) => campiDaMostrare.find((f) => f.name === n));
 
-    // ---------- costruzione colonne (con o senza pivot) ----------
+    // ---------- colonne (con o senza pivot) ----------
     const dimsVis = ordinati.filter((f) => !misure.has(f.name));
     const misVis = ordinati.filter((f) => misure.has(f.name));
 
@@ -169,7 +254,7 @@ looker.plugins.visualizations.add({
         .join(" - ");
     };
 
-    // ---------- ordinamento righe (sulle righe caricate) ----------
+    // ---------- ordinamento righe ----------
     const s = this._sort || {};
     const colSort = s.nome
       ? colonne.find(
@@ -179,7 +264,7 @@ looker.plugins.visualizations.add({
         )
       : null;
 
-    const righe = data.slice();
+    const righe = dati.slice();
     if (colSort) {
       righe.sort((r1, r2) => {
         const c1 = getCell(r1, colSort);
@@ -201,7 +286,9 @@ looker.plugins.visualizations.add({
       const field = col.field;
       const pKey = col.pivot ? col.pivot.key : null;
       const th = document.createElement("th");
-      const attivo = colSort && colSort.field.name === field.name &&
+      const attivo =
+        colSort &&
+        colSort.field.name === field.name &&
         (colSort.pivot ? colSort.pivot.key : null) === pKey;
       const freccia = attivo ? (s.dir === 1 ? " ▲" : " ▼") : "";
       th.textContent = (field.label_short || field.label || field.name) + freccia;
@@ -213,8 +300,7 @@ looker.plugins.visualizations.add({
       th.draggable = true;
 
       th.onclick = () => {
-        const stesso = attivo;
-        self._sort = { nome: field.name, pivotKey: pKey, dir: stesso ? -s.dir : 1 };
+        self._sort = { nome: field.name, pivotKey: pKey, dir: attivo ? -s.dir : 1 };
         rerender();
       };
       th.ondragstart = (e) => e.dataTransfer.setData("text/plain", field.name);
@@ -239,13 +325,11 @@ looker.plugins.visualizations.add({
     table.style.fontSize = "12px";
 
     const thead = document.createElement("thead");
-
     if (!inPivot) {
       const headerRow = document.createElement("tr");
       colonne.forEach((col) => headerRow.appendChild(makeTh(col)));
       thead.appendChild(headerRow);
     } else {
-      // riga 1: dimensioni (rowSpan 2) + etichette pivot (colSpan = n. misure)
       const row1 = document.createElement("tr");
       const row2 = document.createElement("tr");
       dimsVis.forEach((f) => {
@@ -271,9 +355,12 @@ looker.plugins.visualizations.add({
     }
     table.appendChild(thead);
 
-    // ---------- corpo ----------
+    // ---------- corpo (con limite righe) ----------
+    const limite = self._limite || config.max_righe || 500;
     const tbody = document.createElement("tbody");
-    righe.forEach((row) => {
+    const frag = document.createDocumentFragment();
+
+    righe.slice(0, limite).forEach((row) => {
       const tr = document.createElement("tr");
       colonne.forEach((col) => {
         const td = document.createElement("td");
@@ -287,8 +374,6 @@ looker.plugins.visualizations.add({
         td.style.borderBottom = "1px solid #eee";
         td.style.whiteSpace = "nowrap";
         td.style.textAlign = misure.has(col.field.name) ? "right" : "left";
-
-        // drill: apre il menu dei link del campo
         if (cell && cell.links && cell.links.length) {
           td.style.cursor = "pointer";
           td.onclick = (e) =>
@@ -296,11 +381,23 @@ looker.plugins.visualizations.add({
         }
         tr.appendChild(td);
       });
-      tbody.appendChild(tr);
+      frag.appendChild(tr);
     });
+    tbody.appendChild(frag);
     table.appendChild(tbody);
-
     container.appendChild(table);
+
+    if (righe.length > limite) {
+      const btn = document.createElement("button");
+      btn.textContent = "Mostra altre righe (" + limite + " di " + righe.length + ")";
+      btn.style.margin = "8px";
+      btn.onclick = () => {
+        self._limite = limite + (config.max_righe || 500);
+        rerender();
+      };
+      container.appendChild(btn);
+    }
+
     done();
   }
 });
