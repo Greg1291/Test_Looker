@@ -9,6 +9,12 @@ looker.plugins.visualizations.add({
       default: "ordini_toggle_colonne.colonne_selezionate_raw",
       section: "Configurazione"
     },
+    misure_sempre_visibili: {
+      type: "boolean",
+      label: "Mostra sempre le misure",
+      default: false,
+      section: "Configurazione"
+    },
     mostra_debug: {
       type: "boolean",
       label: "Mostra riquadro di debug",
@@ -34,44 +40,49 @@ looker.plugins.visualizations.add({
     const container = this._container;
     container.innerHTML = "";
 
-    // Nome tecnico del campo che espone il valore del filtro (via Liquid _filters).
     const campoTecnico =
       config.campo_tecnico || "ordini_toggle_colonne.colonne_selezionate_raw";
 
-    // Legge il valore del filtro dalla prima riga dei dati: il campo tecnico
-    // contiene lo stesso valore costante su ogni riga.
+    const dimFields = queryResponse.fields.dimension_like;
+    const measureFields = queryResponse.fields.measure_like;
+
+    // Il campo tecnico deve essere nella query
+    if (!dimFields.some((f) => f.name === campoTecnico)) {
+      this.addError({
+        title: "Campo tecnico mancante",
+        message: "Aggiungi '" + campoTecnico + "' alla query come dimensione normale."
+      });
+      done();
+      return;
+    }
+
+    // Valore del filtro letto dalla prima riga
     let rawValue = "";
     if (data && data.length > 0 && data[0][campoTecnico]) {
       rawValue = data[0][campoTecnico].value || "";
     }
 
-    let selezionati = [];
-    if (rawValue) {
-      // Il valore arriva come stringa, es. "paese,regione,categoria".
-      // Ripulisce eventuali apici/virgolette lasciate dal filtro Liquid.
-      selezionati = String(rawValue)
-        .replace(/['"]/g, "")
-        .split(",")
-        .map((v) => v.trim().toLowerCase())
-        .filter((v) => v.length > 0);
-    }
+    const selezionati = String(rawValue)
+      .replace(/['"%]/g, "")
+      .split(",")
+      .map((v) => v.trim().toLowerCase())
+      .filter((v) => v.length > 0);
 
-    // Tutti i campi della query, escluso il campo tecnico (che non va mai mostrato).
-    const tuttiICampi = queryResponse.fields.dimension_like
-      .concat(queryResponse.fields.measure_like)
+    const misure = new Set(measureFields.map((f) => f.name));
+
+    const tuttiICampi = dimFields
+      .concat(measureFields)
       .filter((field) => field.name !== campoTecnico);
 
-    // Nessuna selezione => mostra tutte le colonne.
-    // Con selezione => mostra solo quelle il cui "codice" combacia.
     const campiDaMostrare =
       selezionati.length === 0
         ? tuttiICampi
         : tuttiICampi.filter((field) => {
+            if (config.misure_sempre_visibili && misure.has(field.name)) return true;
             const codice = field.name.split(".").pop().toLowerCase();
             return selezionati.includes(codice);
           });
 
-    // Riquadro di debug opzionale (attivabile dalle opzioni della visualizzazione).
     if (config.mostra_debug) {
       const debugBox = document.createElement("pre");
       debugBox.style.background = "#fff3cd";
@@ -82,16 +93,11 @@ looker.plugins.visualizations.add({
       debugBox.style.wordBreak = "break-all";
       debugBox.textContent =
         "DEBUG\n" +
-        "campo tecnico cercato: " + campoTecnico + "\n" +
-        "campi presenti nella query: " +
-        JSON.stringify(
-          queryResponse.fields.dimension_like
-            .concat(queryResponse.fields.measure_like)
-            .map((f) => f.name)
-        ) + "\n" +
-        "rawValue letto dal campo tecnico: " + JSON.stringify(rawValue) + "\n" +
+        "campo tecnico: " + campoTecnico + "\n" +
+        "campi in query: " + JSON.stringify(dimFields.concat(measureFields).map((f) => f.name)) + "\n" +
+        "rawValue: " + JSON.stringify(rawValue) + "\n" +
         "codici selezionati: " + JSON.stringify(selezionati) + "\n" +
-        "colonne da mostrare: " + JSON.stringify(campiDaMostrare.map((f) => f.name));
+        "colonne mostrate: " + JSON.stringify(campiDaMostrare.map((f) => f.name));
       container.appendChild(debugBox);
     }
 
@@ -99,27 +105,25 @@ looker.plugins.visualizations.add({
       this.addError({
         title: "Nessuna colonna selezionata",
         message:
-          "Nessuna colonna corrisponde alla selezione. Verifica che i valori del filtro " +
-          "coincidano con i nomi tecnici dei campi (es. 'paese', 'importo_totale')."
+          "Nessuna colonna corrisponde alla selezione. I valori del filtro devono coincidere " +
+          "con i nomi tecnici dei campi (es. 'paese', 'importo_totale')."
       });
       done();
       return;
     }
 
-    // Costruzione tabella HTML: solo le colonne selezionate, header incluso
     const table = document.createElement("table");
     table.style.borderCollapse = "collapse";
     table.style.width = "100%";
     table.style.fontFamily = "inherit";
     table.style.fontSize = "12px";
 
-    // Header
     const thead = document.createElement("thead");
     const headerRow = document.createElement("tr");
     campiDaMostrare.forEach((field) => {
       const th = document.createElement("th");
       th.textContent = field.label_short || field.label || field.name;
-      th.style.textAlign = "left";
+      th.style.textAlign = misure.has(field.name) ? "right" : "left";
       th.style.padding = "6px 10px";
       th.style.borderBottom = "2px solid #ddd";
       th.style.whiteSpace = "nowrap";
@@ -128,17 +132,17 @@ looker.plugins.visualizations.add({
     thead.appendChild(headerRow);
     table.appendChild(thead);
 
-    // Body
     const tbody = document.createElement("tbody");
     data.forEach((row) => {
       const tr = document.createElement("tr");
       campiDaMostrare.forEach((field) => {
         const td = document.createElement("td");
         const cell = row[field.name];
-        td.textContent = cell ? cell.value : "";
+        td.textContent = cell ? (cell.rendered || cell.value) : "";
         td.style.padding = "6px 10px";
         td.style.borderBottom = "1px solid #eee";
         td.style.whiteSpace = "nowrap";
+        td.style.textAlign = misure.has(field.name) ? "right" : "left";
         tr.appendChild(td);
       });
       tbody.appendChild(tr);

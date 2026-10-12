@@ -72,7 +72,7 @@ view: ordini_toggle_colonne {
           d.ls[OFFSET(MOD(n * 7, ARRAY_LENGTH(d.ls)))].regione  AS regione,
           d.ls[OFFSET(MOD(n * 7, ARRAY_LENGTH(d.ls)))].citta    AS citta,
           d.cs[OFFSET(MOD(n * 3, ARRAY_LENGTH(d.cs)))]          AS categoria,
-          ROUND(10 + MOD(n * 7919, 49000) / 100, 2)/ROUND(10,10000)             AS importo,
+          ROUND(RAND() * 100, 2)                               AS importo,
           DATE_ADD(DATE '2026-01-01', INTERVAL MOD(n * 31, 365) DAY) AS data_ordine
         FROM UNNEST(GENERATE_ARRAY(1, 1000000)) AS n
         CROSS JOIN (
