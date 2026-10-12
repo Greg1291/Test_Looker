@@ -65,17 +65,34 @@ view: ordini_toggle_colonne {
       CAST(NULL AS DATE)
       {% endif %} AS data_ordine
 
-      FROM (
-      SELECT 1  AS id_ordine, 'Italia'   AS paese, 'Lombardia'     AS regione, 'Milano'      AS citta, 'Elettronica'   AS categoria, 120.50 AS importo, DATE('2026-01-05') AS data_ordine UNION ALL
-      SELECT 2  AS id_ordine, 'Italia'   AS paese, 'Lazio'         AS regione, 'Roma'        AS citta, 'Abbigliamento' AS categoria, 75.00  AS importo, DATE('2026-01-08') AS data_ordine UNION ALL
-      SELECT 3  AS id_ordine, 'Francia'  AS paese, 'Île-de-France' AS regione, 'Parigi'      AS citta, 'Elettronica'   AS categoria, 230.00 AS importo, DATE('2026-01-10') AS data_ordine UNION ALL
-      SELECT 4  AS id_ordine, 'Germania' AS paese, 'Baviera'       AS regione, 'Monaco'      AS citta, 'Casa'          AS categoria, 45.90  AS importo, DATE('2026-01-12') AS data_ordine UNION ALL
-      SELECT 5  AS id_ordine, 'Italia'   AS paese, 'Veneto'        AS regione, 'Venezia'     AS citta, 'Abbigliamento' AS categoria, 99.99  AS importo, DATE('2026-01-15') AS data_ordine UNION ALL
-      SELECT 6  AS id_ordine, 'Spagna'   AS paese, 'Catalogna'     AS regione, 'Barcellona'  AS citta, 'Elettronica'   AS categoria, 310.00 AS importo, DATE('2026-01-18') AS data_ordine UNION ALL
-      SELECT 7  AS id_ordine, 'Italia'   AS paese, 'Lombardia'     AS regione, 'Bergamo'     AS citta, 'Casa'          AS categoria, 60.00  AS importo, DATE('2026-01-20') AS data_ordine UNION ALL
-      SELECT 8  AS id_ordine, 'Francia'  AS paese, 'Provenza'      AS regione, 'Marsiglia'   AS citta, 'Abbigliamento' AS categoria, 88.50  AS importo, DATE('2026-01-22') AS data_ordine UNION ALL
-      SELECT 9  AS id_ordine, 'Germania' AS paese, 'Assia'         AS regione, 'Francoforte' AS citta, 'Elettronica'   AS categoria, 150.00 AS importo, DATE('2026-01-25') AS data_ordine UNION ALL
-      SELECT 10 AS id_ordine, 'Italia'   AS paese, 'Lazio'         AS regione, 'Latina'      AS citta, 'Casa'          AS categoria, 40.20  AS importo, DATE('2026-01-28') AS data_ordine
+            FROM (
+        SELECT
+          n AS id_ordine,
+          d.ls[OFFSET(MOD(n * 7, ARRAY_LENGTH(d.ls)))].paese    AS paese,
+          d.ls[OFFSET(MOD(n * 7, ARRAY_LENGTH(d.ls)))].regione  AS regione,
+          d.ls[OFFSET(MOD(n * 7, ARRAY_LENGTH(d.ls)))].citta    AS citta,
+          d.cs[OFFSET(MOD(n * 3, ARRAY_LENGTH(d.cs)))]          AS categoria,
+          ROUND(10 + MOD(n * 7919, 49000) / 100, 2)             AS importo,
+          DATE_ADD(DATE '2026-01-01', INTERVAL MOD(n * 31, 365) DAY) AS data_ordine
+        FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS n
+        CROSS JOIN (
+          SELECT
+            [
+              STRUCT('Italia'   AS paese, 'Lombardia'     AS regione, 'Milano'      AS citta),
+              STRUCT('Italia',            'Lombardia',                'Bergamo'),
+              STRUCT('Italia',            'Lazio',                    'Roma'),
+              STRUCT('Italia',            'Lazio',                    'Latina'),
+              STRUCT('Italia',            'Veneto',                   'Venezia'),
+              STRUCT('Francia',           'Île-de-France',            'Parigi'),
+              STRUCT('Francia',           'Provenza',                 'Marsiglia'),
+              STRUCT('Germania',          'Baviera',                  'Monaco'),
+              STRUCT('Germania',          'Assia',                    'Francoforte'),
+              STRUCT('Spagna',            'Catalogna',                'Barcellona'),
+              STRUCT('Spagna',            'Madrid',                   'Madrid'),
+              STRUCT('Spagna',            'Andalusia',                'Siviglia')
+            ] AS ls,
+            ['Elettronica', 'Abbigliamento', 'Casa', 'Sport', 'Giardino'] AS cs
+        ) AS d
       ) AS base
       ;;
   }
