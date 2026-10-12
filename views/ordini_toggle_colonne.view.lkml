@@ -74,7 +74,7 @@ view: ordini_toggle_colonne {
           d.cs[OFFSET(MOD(n * 3, ARRAY_LENGTH(d.cs)))]          AS categoria,
           ROUND(10 + MOD(n * 7919, 49000) / 100, 2)             AS importo,
           DATE_ADD(DATE '2026-01-01', INTERVAL MOD(n * 31, 365) DAY) AS data_ordine
-        FROM UNNEST(GENERATE_ARRAY(1, 100000)) AS n
+        FROM UNNEST(GENERATE_ARRAY(1, 10000000)) AS n
         CROSS JOIN (
           SELECT
             [
